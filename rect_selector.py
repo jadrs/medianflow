@@ -15,7 +15,8 @@ class RectSelector:
             self.drag_start = (x, y)
 
         if self.drag_start:
-            if event == cv2.EVENT_LBUTTONDOWN or flags & cv2.EVENT_FLAG_LBUTTON:
+            if event == cv2.EVENT_LBUTTONDOWN or \
+               (flags & cv2.EVENT_FLAG_LBUTTON and event != cv2.EVENT_LBUTTONUP):
                 xo, yo = self.drag_start
                 x0, y0 = np.minimum([xo, yo], [x, y])
                 x1, y1 = np.maximum([xo, yo], [x, y])
