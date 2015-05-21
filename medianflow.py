@@ -72,7 +72,7 @@ class MedianFlowTracker(object):
         dy = np.median(p1[:, 1] - p0[:, 1])
 
         # all pairs in prev and curr
-        ii, jj = np.meshgrid(range(p0.shape[0]), range(p0.shape[0]), ordering='ij')
+        ii, jj = np.meshgrid(range(p0.shape[0]), range(p0.shape[0]), indexing='ij')
         ii, jj = ii.flatten(), jj.flatten()
         noneq = np.where(ii != jj)[0]
         pdiff0 = p0[ii[noneq]] - p0[jj[noneq]]
@@ -135,9 +135,11 @@ class API(object):
 
         while True:
             if not self.rect_selector.dragging and not self.paused:
-                ret, frame = self._device.read()
+                ret, grabbed_frame = self._device.read()
                 if not ret:
                     break
+
+            frame = grabbed_frame.copy()
 
             prev, curr = curr, cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
