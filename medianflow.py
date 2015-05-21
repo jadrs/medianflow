@@ -135,9 +135,11 @@ class API(object):
 
         while True:
             if not self.rect_selector.dragging and not self.paused:
-                ret, frame = self._device.read()
+                ret, grabbed_frame = self._device.read()
                 if not ret:
                     break
+
+            frame = grabbed_frame.copy()
 
             prev, curr = curr, cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
