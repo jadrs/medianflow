@@ -92,7 +92,7 @@ class MedianFlowTracker(object):
         # estimate rotation
         theta0 = self._atan2(pdiff0[:, 1], pdiff0[:, 0])
         theta1 = self._atan2(pdiff1[:, 1], pdiff1[:, 0])
-        dtheta = np.median(theta0 - theta1)
+        dtheta = np.median(theta1 - theta0)
 
         return (x0 + ds * dx,
                 y0 + ds * dy,
@@ -152,7 +152,7 @@ class API(object):
 
                 center = (int(tgt[0]), int(tgt[1]))
                 scale = (int(tgt[2]), int(tgt[3]))
-                angle = -tgt[4] * 180.0 / np.pi
+                angle = tgt[4] * 180.0 / np.pi
                 cv.Ellipse(cv.fromarray(frame), center, scale, angle, 0., 360., color, 2)
 
             self.rect_selector.draw(frame)
