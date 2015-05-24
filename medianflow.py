@@ -100,10 +100,10 @@ class MedianFlowTracker(object):
         if bb_curr[0] >= bb_curr[2] or bb_curr[1] >= bb_curr[3]:
             return None
 
-        bb_curr = (min(max(0, bb_curr[0]), curr.shape[0]),
-                   min(max(0, bb_curr[1]), curr.shape[1]),
-                   min(max(0, bb_curr[2]), curr.shape[0]),
-                   min(max(0, bb_curr[3]), curr.shape[1]))
+        bb_curr = (min(max(0, bb_curr[0]), curr.shape[1]),
+                   min(max(0, bb_curr[1]), curr.shape[0]),
+                   min(max(0, bb_curr[2]), curr.shape[1]),
+                   min(max(0, bb_curr[3]), curr.shape[0]))
 
         return bb_curr
 
