@@ -20,6 +20,7 @@ import cv2
 
 from rect_selector import RectSelector
 
+
 class MedianFlowTracker(object):
     def __init__(self):
         self.lk_params = dict(winSize  = (11, 11),
@@ -28,23 +29,16 @@ class MedianFlowTracker(object):
 
         self._atan2 = np.vectorize(np.math.atan2)
 
-    #@profile
     def track(self, bb, prev, curr):
         self._n_samples = 100
         self._fb_max_dist = 1
         self._ds_factor = 0.95
+        self._min_n_points = 10
 
         # sample points inside the bounding box
         p0 = np.empty((self._n_samples, 2))
         p0[:, 0] = np.random.randint(bb[0], bb[2] + 1, self._n_samples)
         p0[:, 1] = np.random.randint(bb[1], bb[3] + 1, self._n_samples)
-
-        # x0 = 0.5 * (bb[0] + bb[2])
-        # sx = 0.5 * (bb[2] - bb[0])
-        # y0 = 0.5 * (bb[1] + bb[3])
-        # sy = 0.5 * (bb[3] - bb[1])
-        # p0[:, 0] = np.random.normal(x0, sx, self._n_samples)
-        # p0[:, 1] = np.random.normal(y0, sy, self._n_samples)
 
         p0 = p0.astype(np.float32)
 
@@ -54,16 +48,20 @@ class MedianFlowTracker(object):
         p0 = p0[indx, :]
         p1 = p1[indx, :]
         p0r, st, err = cv2.calcOpticalFlowPyrLK(curr, prev, p1, None, **self.lk_params)
+        if err is None:
+            return None
+
+        # check forward-backward error and min number of points
         fb_dist = np.abs(p0 - p0r).max(axis=1)
         good = fb_dist < self._fb_max_dist
 
         # keep half of the points
         err = err[good].flatten()
-        indx = np.argsort(err)[::-1]
-        if len(indx) < 10:
+        if len(err) < self._min_n_points:
             return None
 
-        half_indx = indx[:len(indx) / 2]
+        indx = np.argsort(err)
+        half_indx = indx[:len(indx) // 2]
         p0 = (p0[good])[half_indx]
         p1 = (p1[good])[half_indx]
 
@@ -72,11 +70,9 @@ class MedianFlowTracker(object):
         dy = np.median(p1[:, 1] - p0[:, 1])
 
         # all pairs in prev and curr
-        ii, jj = np.meshgrid(range(p0.shape[0]), range(p0.shape[0]), indexing='ij')
-        ii, jj = ii.flatten(), jj.flatten()
-        noneq = np.where(ii != jj)[0]
-        pdiff0 = p0[ii[noneq]] - p0[jj[noneq]]
-        pdiff1 = p1[ii[noneq]] - p1[jj[noneq]]
+        i, j = np.triu_indices(len(p0), k=1)
+        pdiff0 = p0[i] - p0[j]
+        pdiff1 = p1[i] - p1[j]
 
         # estimate change in scale
         p0_dist = np.sum(pdiff0 ** 2, axis=1)
@@ -84,14 +80,9 @@ class MedianFlowTracker(object):
         ds = np.sqrt(np.median(p1_dist / (p0_dist + 2**-23)))
         ds = (1.0 - self._ds_factor) + self._ds_factor * ds;
 
-        # estimate rotation
-        theta0 = self._atan2(pdiff0[:, 1], pdiff0[:, 0])
-        theta1 = self._atan2(pdiff1[:, 1], pdiff1[:, 0])
-        dtheta = np.median(theta1 - theta0) * 180.0 / np.pi
-
         # update bounding box
-        dx_scale = (ds - 1.0) * 0.5 * (bb[3] - bb[1])
-        dy_scale = (ds - 1.0) * 0.5 * (bb[2] - bb[0])
+        dx_scale = (ds - 1.0) * 0.5 * (bb[3] - bb[1] + 1)
+        dy_scale = (ds - 1.0) * 0.5 * (bb[2] - bb[0] + 1)
         bb_curr = (int(bb[0] + dx - dx_scale + 0.5),
                    int(bb[1] + dy - dy_scale + 0.5),
                    int(bb[2] + dx + dx_scale + 0.5),

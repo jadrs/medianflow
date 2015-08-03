@@ -2,7 +2,7 @@
 """ MedianFlow sandbox
 
 Usage:
-  medianflow.py SOURCE
+  medianflow++.py SOURCE
 
 Options:
   SOURCE    INT: camera, STR: video file
@@ -20,13 +20,15 @@ import cv, cv2
 
 from rect_selector import RectSelector
 
+
 class MedianFlowTracker(object):
     def __init__(self):
-        self.lk_params = dict(winSize  = (15, 15),
+        self.lk_params = dict(winSize  = (11, 11),
                               maxLevel = 3,
                               criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.1))
 
         self._atan2 = np.vectorize(np.math.atan2)
+
         self._n_samples = 100
         self._min_n_points = 10
         self._fb_max_dist = 1
@@ -42,46 +44,45 @@ class MedianFlowTracker(object):
                        np.random.normal(0.0, self._concentration * sy, self._n_samples)])
         ct, st = np.cos(theta), np.sin(theta)
         R = np.array([[ct, st], [-st, ct]])
-        p0 = np.dot(R, p0) + np.array([[x0], [y0]])
-        p0 = p0.transpose()
+        p0 = np.transpose(np.dot(R, p0) + np.array([[x0], [y0]]))
 
         indx = (p0[:, 0] >= 0.0) & (p0[:, 0] < prev.shape[1]) & \
                (p0[:, 1] >= 0.0) & (p0[:, 1] < prev.shape[0])
         if len(indx) < self._min_n_points:
             return None
-        p0 = p0[indx, :]
+
+        p0 = p0[indx, :].astype(np.float32)
 
         # forward-backward tracking
-        p0 = p0.astype(np.float32)
         p1, st, err = cv2.calcOpticalFlowPyrLK(prev, curr, p0, None, **self.lk_params)
-        indx = (st.squeeze() == 1)
-        if len(indx) < self._min_n_points:
-            return None
+        indx = np.where(st == 1)[0]
         p0 = p0[indx, :]
         p1 = p1[indx, :]
         p0r, st, err = cv2.calcOpticalFlowPyrLK(curr, prev, p1, None, **self.lk_params)
+        if err is None:
+            return None
+
+        # check forward-backward error and min number of points
         fb_dist = np.abs(p0 - p0r).max(axis=1)
         good = fb_dist < self._fb_max_dist
-        if np.sum(good) < self._min_n_points:
+        err = err[good].flatten()
+        if len(err) < self._min_n_points:
             return None
-        err = err[good].squeeze()
 
         # keep half of the points
-        indx = np.argsort(err)[::-1]
-        half_indx = indx[:len(indx) / 2]
+        indx = np.argsort(err)
+        half_indx = indx[:len(indx) // 2]
         p0 = (p0[good])[half_indx]
         p1 = (p1[good])[half_indx]
 
-        # estimate displacement
+        # estimate median displacement
         dx = np.median(p1[:, 0] - p0[:, 0])
         dy = np.median(p1[:, 1] - p0[:, 1])
 
         # all pairs in prev and curr
-        ii, jj = np.meshgrid(range(p0.shape[0]), range(p0.shape[0]), indexing='ij')
-        ii, jj = ii.flatten(), jj.flatten()
-        noneq = np.where(ii != jj)[0]
-        pdiff0 = p0[ii[noneq]] - p0[jj[noneq]]
-        pdiff1 = p1[ii[noneq]] - p1[jj[noneq]]
+        i, j = np.triu_indices(len(p0), k=1)
+        pdiff0 = p0[i] - p0[j]
+        pdiff1 = p1[i] - p1[j]
 
         # estimate change in scale
         p0_dist = np.sum(pdiff0 ** 2, axis=1)
@@ -119,8 +120,8 @@ class API(object):
     def on_rect(self, rect):
         self._target = [0.5 * (rect[0] + rect[2]),
                         0.5 * (rect[1] + rect[3]),
-                        0.5 * (rect[2] - rect[0]),
-                        0.5 * (rect[3] - rect[1]),
+                        0.5 * (rect[2] - rect[0] + 1.0),
+                        0.5 * (rect[3] - rect[1] + 1.0),
                         0.0]
 
     def run(self):
