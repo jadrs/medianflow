@@ -16,7 +16,7 @@ from os.path import abspath, exists
 
 import numpy as np
 
-import cv, cv2
+import cv2
 
 from rect_selector import RectSelector
 
@@ -154,7 +154,7 @@ class API(object):
                 center = (int(tgt[0]), int(tgt[1]))
                 scale = (int(tgt[2]), int(tgt[3]))
                 angle = tgt[4] * 180.0 / np.pi
-                cv.Ellipse(cv.fromarray(frame), center, scale, angle, 0., 360., color, 2)
+                cv2.ellipse(frame, center, scale, angle, 0., 360., color, 2)
 
             self.rect_selector.draw(frame)
 
